@@ -56,7 +56,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  List<Note> _notes = [];
 
   String userName = const String.fromEnvironment('USERNAME');
   String password = const String.fromEnvironment('PASSWORD');
@@ -84,9 +84,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
       print("result:${fetchResult.messages.length}");
       for (final message in fetchResult.messages) {
+        final body = message.mimeData?.decodeText(message.mimeData?.contentType, "8bit");
         print(message.decodeSubject());
-        print(message.mimeData?.decodeText(message.mimeData?.contentType, "8bit"));
+        print(body);
         print("=====================");
+        _notes.add(Note(message.decodeSubject() ?? "", body ?? ""));
       }
 
       await client.logout();
@@ -126,37 +128,22 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Center(
         // Center is a layout widget. It takes a single child and positions it
         // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+        child: ListView(
+          children: _notes.map((e) => Text(e.title)).toList(),          
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _getNotes,
+        onPressed: () => setState(_getNotes),
         tooltip: 'Increment',
         child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+}
+
+class Note {
+  final String title;
+  final String body;
+
+  Note(this.title, this.body);
 }
