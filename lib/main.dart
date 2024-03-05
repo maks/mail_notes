@@ -1,3 +1,4 @@
+import 'package:enough_mail/imap.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -57,15 +58,51 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  String userName = const String.fromEnvironment('USERNAME');
+  String password = const String.fromEnvironment('PASSWORD');
+  String imapServerHost = 'imap.fastmail.com';
+  int imapServerPort = 993;
+  bool isImapServerSecure = true;
+
+  Future<void> _getNotes() async {
+    final client = ImapClient(isLogEnabled: false);
+    try {
+      await client.connectToServer(imapServerHost, imapServerPort,
+          isSecure: isImapServerSecure);
+      await client.login(userName, password);
+
+      final mailboxes = await client.listMailboxes();
+
+      // await client.selectMailboxByPath("Notes");
+      await client
+          .selectMailbox(mailboxes.firstWhere((b) => b.name == "Notes"));
+
+      // fetch 10 most recent messages:
+      // final fetchResult = await client.fetchRecentMessages(
+      //     messageCount: 10, criteria: 'BODY.PEEK[]');
+      final fetchResult = await client.fetchRecentMessages();
+
+      print("result:${fetchResult.messages.length}");
+      for (final message in fetchResult.messages) {
+        print(message.decodeSubject());
+        print(message.mimeData?.decodeText(message.mimeData?.contentType, "8bit"));
+        print("=====================");
+      }
+
+      await client.logout();
+      print("=== IMAP LOGOUT");
+    } on ImapException catch (e) {
+      print('IMAP failed with $e');
+    }
+  }
+
+  Future<MimeMessage> _newNote(String title, String text) async {
+    final builder = MessageBuilder();
+    builder.addTextPlain(text);
+    builder.subject = title;
+    builder.sender = MailAddress.parse(userName);
+    // builder.setHeader("X-Uniform-Type-Identifier", "com.apple.mail-note");
+    return builder.buildMimeMessage();
   }
 
   @override
@@ -116,7 +153,7 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
+        onPressed: _getNotes,
         tooltip: 'Increment',
         child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
