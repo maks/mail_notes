@@ -76,15 +76,13 @@ class _MyHomePageState extends State<MyHomePage> {
       // await client.selectMailboxByPath("Notes");
       await client
           .selectMailbox(mailboxes.firstWhere((b) => b.name == "Notes"));
-
-      // fetch 10 most recent messages:
-      // final fetchResult = await client.fetchRecentMessages(
-      //     messageCount: 10, criteria: 'BODY.PEEK[]');
       final fetchResult = await client.fetchRecentMessages();
 
       print("result:${fetchResult.messages.length}");
+      _notes.clear();
       for (final message in fetchResult.messages) {
-        final body = message.mimeData?.decodeText(message.mimeData?.contentType, "8bit");
+        final body =
+            message.mimeData?.decodeText(message.mimeData?.contentType, "8bit");
         print(message.decodeSubject());
         print(body);
         print("=====================");
@@ -93,8 +91,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
       await client.logout();
       print("=== IMAP LOGOUT");
-    } on ImapException catch (e) {
-      print('IMAP failed with $e');
+
+      setState(() {
+        //na
+      });
+    } on ImapException catch (e, st) {
+      print('IMAP failed with $e \n $st');
     }
   }
 
@@ -103,40 +105,56 @@ class _MyHomePageState extends State<MyHomePage> {
     builder.addTextPlain(text);
     builder.subject = title;
     builder.sender = MailAddress.parse(userName);
-    // builder.setHeader("X-Uniform-Type-Identifier", "com.apple.mail-note");
+    builder.setHeader("X-Uniform-Type-Identifier", "com.apple.mail-note");
     return builder.buildMimeMessage();
+  }
+
+  Future<void> _addNote(String title, String text) async {
+    final note = await _newNote(title, text);
+
+    final client = ImapClient(isLogEnabled: false);
+    try {
+      await client.connectToServer(imapServerHost, imapServerPort,
+          isSecure: isImapServerSecure);
+      await client.login(userName, password);
+
+      final mailboxes = await client.listMailboxes();
+
+      await client
+          .selectMailbox(mailboxes.firstWhere((b) => b.name == "Notes"));
+
+      await client.appendMessage(note);
+    } on ImapException catch (e, st) {
+      print('IMAP failed with $e \n $st');
+    }
+
+    //refresh list manually for now here
+      _getNotes();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _getNotes();
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: ListView(
-          children: _notes.map((e) => Text(e.title)).toList(),          
+          children: _notes.map((e) => Text(e.title)).toList(),
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => setState(_getNotes),
+        onPressed: () => _addNote("mailnotes test 2", "this is a test 2"),
         tooltip: 'Increment',
         child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      ),
     );
   }
 }
