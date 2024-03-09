@@ -56,7 +56,8 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  List<Note> _notes = [];
+  final List<Note> _notes = [];
+  Note? _currentNote;
 
   String userName = const String.fromEnvironment('USERNAME');
   String password = const String.fromEnvironment('PASSWORD');
@@ -129,7 +130,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     //refresh list manually for now here
-      _getNotes();
+    _getNotes();
   }
 
   @override
@@ -146,8 +147,24 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Center(
-        child: ListView(
-          children: _notes.map((e) => Text(e.title)).toList(),
+        child: Row(
+          children: [
+            Container(
+              height: 300,
+              width: 200,
+              child: ListView(
+                children: _notes
+                    .map((e) => ListTile(
+                          title: Text(e.title),
+                          onTap: () => setState(() {
+                            _currentNote = e;
+                          }),
+                        ))
+                    .toList(),
+              ),
+            ),
+            NoteEditor(note: _currentNote ?? Note("title", "body")),
+          ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -155,6 +172,45 @@ class _MyHomePageState extends State<MyHomePage> {
         tooltip: 'Increment',
         child: const Icon(Icons.add),
       ),
+    );
+  }
+}
+
+class NoteEditor extends StatefulWidget {
+  final Note note;
+
+  const NoteEditor({super.key, required this.note});
+
+  @override
+  State<NoteEditor> createState() => _NoteEditorState();
+}
+
+class _NoteEditorState extends State<NoteEditor> {
+  final TextEditingController _textController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _textController.text = widget.note.body;
+    print("body: ${widget.note.body.substring(0, 20)}");
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _textController.text = widget.note.body;
+    return Column(
+      children: [
+        Text(
+          widget.note.title,
+          maxLines: 1,
+        ),
+        SizedBox(
+          width: 220,
+          child: TextField(
+            // controller: _textController,
+          ),
+        ),
+      ],
     );
   }
 }
