@@ -1,8 +1,12 @@
 import 'dart:io';
 
 import 'package:enough_mail/imap.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+
+
+const _enableImport = false;
 
 void main() {
   runApp(const MyApp());
@@ -57,41 +61,46 @@ class _MyHomePageState extends State<MyHomePage> {
           .selectMailbox(mailboxes.firstWhere((b) => b.name == "Notes"));
       final fetchResult = await client.fetchRecentMessages();
 
-      print("result:${fetchResult.messages.length}");
+      debugPrint("result:${fetchResult.messages.length}");
       _notes.clear();
       for (final message in fetchResult.messages) {
         final body =
             message.mimeData?.decodeText(message.mimeData?.contentType, "8bit");
-        print(message.decodeSubject());
-        print(body);
-        print("=====================");
+        debugPrint(message.decodeSubject());
+        debugPrint(body);
+        debugPrint("=====================");
         _notes.add(Note(message.decodeSubject() ?? "", body ?? ""));
       }
 
       await client.logout();
-      print("=== IMAP LOGOUT");
+      debugPrint("=== IMAP LOGOUT");
 
       setState(() {
         //na
       });
     } on ImapException catch (e, st) {
-      print('IMAP failed with $e \n $st');
+      debugPrint('IMAP failed with $e \n $st');
     }
   }
 
-  Future<void> _importNotes(Directory importPath) async {
+  Future<String> _importNotes(Directory importPath) async {
     final entriesStream = importPath.list();
-    entriesStream.forEach((el) async {
-      // print("file: ${el.path}");
-      if (el is File) {
-        final name = p.basename(el.path);
-        if (name.endsWith('.md') || name.endsWith(".txt")) {
-          final noteText = await el.readAsString();
-          final n = Note(name, noteText);
-          print("note: $n");
+    int count = 0;
+    await entriesStream.forEach((ent) async {
+      if (ent is File) {
+        final ext = p.extension(ent.path);
+        if (ext.toLowerCase() == '.md' || ext.toLowerCase() == ".txt") {
+          if (_enableImport) {
+            final title = p.basenameWithoutExtension(ent.path);
+            final noteText = await ent.readAsString();
+            _addNote(title, noteText);
+            debugPrint("note: $title");
+            count++;
+          }
         }
       }
     });
+    return "imported $count txt/md notes";
   }
 
   Future<MimeMessage> _newNote(String title, String text) async {
@@ -119,7 +128,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
       await client.appendMessage(note);
     } on ImapException catch (e, st) {
-      print('IMAP failed with $e \n $st');
+      debugPrint('IMAP failed with $e \n $st');
     }
 
     //refresh list manually for now here
@@ -144,9 +153,31 @@ class _MyHomePageState extends State<MyHomePage> {
               Icons.upload,
               color: Colors.white,
             ),
-            onPressed: () {
-              print("import...");
-              _importNotes(Directory("/temp"));
+            onPressed: () async {
+              debugPrint("import...");
+              final String? directoryPath = await getDirectoryPath();
+              if (directoryPath == null) {
+                // Operation was canceled by the user.
+                return;
+              }
+              final result = await _importNotes(Directory(directoryPath));
+              showDialog(
+                // ignore: use_build_context_synchronously
+                context: context,
+                barrierDismissible: false, // user must tap button!
+                builder: (_) => AlertDialog(
+                  title: const Text("Import Result"),
+                  content: Text(result),
+                  actions: <Widget>[
+                    TextButton(
+                      child: const Text('Ok'),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ],
+                ),
+              );
             },
           ),
           IconButton(
@@ -155,10 +186,9 @@ class _MyHomePageState extends State<MyHomePage> {
               color: Colors.white,
             ),
             onPressed: () {
-               throw UnimplementedError("settings not done yet");
+              throw UnimplementedError("settings not done yet");
             },
           ),
-          
         ],
       ),
       body: Center(
@@ -183,8 +213,11 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _addNote("mailnotes test 2", "this is a test 2"),
-        tooltip: 'Increment',
+        onPressed: () {
+          // _addNote("mailnotes test 2", "this is a test 2");
+          throw UnimplementedError("add note not done yet");
+        },
+        tooltip: 'Add Note',
         child: const Icon(Icons.add),
       ),
     );
@@ -218,7 +251,7 @@ class _NoteEditorState extends State<NoteEditor> {
           widget.note.title,
           maxLines: 1,
         ),
-        SizedBox(
+        const SizedBox(
           width: 220,
           child: TextField(
               // controller: _textController,
