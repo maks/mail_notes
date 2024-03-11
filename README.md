@@ -1,16 +1,26 @@
-# mail_notes
+# Mail Notes
 
-A new Flutter project.
+A note taking app which uses an IMAP folder as a storage backend. 
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+[X] Use an IMAP folder as a storage backend for your notes
+[X] Import existing notes in a local folder in plain text or markdown
+[ ] Settings UI for your IMAP service
+[ ] Add edit & delete  
+[ ] Full text search in notes
+[ ] Local cache for offline access to notes
 
-A few resources to get you started if this is your first Flutter project:
+## Supported platforms
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+[X] Linux
+[ ] Android
+[ ] Web
+[ ] MacOS
+[ ] iOS
+[ ] Windows
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Manual
+
+Until this app is feature complete, you can use other clients to access you notes inside your `Notes` folder (mailbox) on your IMAP server. I highly recommend [Fastmail](https://www.fastmail.com/), whose web and mobile clients have nice, dedicated support for notes inside a Notes folder.
+
