@@ -6,8 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 
-const _enableImport = false;
-
 void main() {
   runApp(const MyApp());
 }
@@ -40,6 +38,8 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final List<Note> _notes = [];
   Note? _currentNote;
+  String? _importProgress;
+  late final Future<ImapClient> _imapClient = _initImap();
 
   String userName = const String.fromEnvironment('USERNAME');
   String password = const String.fromEnvironment('PASSWORD');
@@ -47,16 +47,19 @@ class _MyHomePageState extends State<MyHomePage> {
   int imapServerPort = 993;
   bool isImapServerSecure = true;
 
-  Future<void> _getNotes() async {
-    final client = ImapClient(isLogEnabled: false);
-    try {
-      await client.connectToServer(imapServerHost, imapServerPort,
-          isSecure: isImapServerSecure);
-      await client.login(userName, password);
+  Future<ImapClient> _initImap() async {
+    final c = ImapClient(isLogEnabled: false);
+    await c.connectToServer(imapServerHost, imapServerPort,
+        isSecure: isImapServerSecure);
+    await c.login(userName, password);
+    return c;
+  }
 
+  Future<void> _getNotes() async {
+    try {
+      final client = (await _imapClient);
       final mailboxes = await client.listMailboxes();
 
-      // await client.selectMailboxByPath("Notes");
       await client
           .selectMailbox(mailboxes.firstWhere((b) => b.name == "Notes"));
       final fetchResult = await client.fetchRecentMessages();
@@ -66,41 +69,44 @@ class _MyHomePageState extends State<MyHomePage> {
       for (final message in fetchResult.messages) {
         final body =
             message.mimeData?.decodeText(message.mimeData?.contentType, "8bit");
-        debugPrint(message.decodeSubject());
-        debugPrint(body);
-        debugPrint("=====================");
+        // debugPrint(message.decodeSubject());
+        // debugPrint(body);
+        // debugPrint("=====================");
         _notes.add(Note(message.decodeSubject() ?? "", body ?? ""));
       }
 
-      await client.logout();
-      debugPrint("=== IMAP LOGOUT");
-
       setState(() {
-        //na
+        // just to trigger refresh of fetched notes
       });
     } on ImapException catch (e, st) {
       debugPrint('IMAP failed with $e \n $st');
     }
   }
 
-  Future<String> _importNotes(Directory importPath) async {
+  Future<void> _importNotes(Directory importPath) async {
+    setState(() {
+      _importProgress = "Starting import...";
+    });
     final entriesStream = importPath.list();
-    int count = 0;
-    await entriesStream.forEach((ent) async {
+    int count = 0;   
+    await for (final ent in entriesStream) {
       if (ent is File) {
         final ext = p.extension(ent.path);
         if (ext.toLowerCase() == '.md' || ext.toLowerCase() == ".txt") {
-          if (_enableImport) {
-            final title = p.basenameWithoutExtension(ent.path);
-            final noteText = await ent.readAsString();
-            _addNote(title, noteText);
-            debugPrint("note: $title");
-            count++;
-          }
+          final title = p.basenameWithoutExtension(ent.path);
+          final noteText = await ent.readAsString();
+          await _addNote(title, noteText);
+          debugPrint("added note: $title");
+          setState(() {
+            _importProgress = "[$count] added note: $title";
+          });
+          count++;
         }
       }
+    }
+    setState(() {
+    _importProgress = "Finished import:$count txt/md notes imported";
     });
-    return "imported $count txt/md notes";
   }
 
   Future<MimeMessage> _newNote(String title, String text) async {
@@ -115,12 +121,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _addNote(String title, String text) async {
     final note = await _newNote(title, text);
 
-    final client = ImapClient(isLogEnabled: false);
     try {
-      await client.connectToServer(imapServerHost, imapServerPort,
-          isSecure: isImapServerSecure);
-      await client.login(userName, password);
-
+      final client = (await _imapClient);
       final mailboxes = await client.listMailboxes();
 
       await client
@@ -130,14 +132,12 @@ class _MyHomePageState extends State<MyHomePage> {
     } on ImapException catch (e, st) {
       debugPrint('IMAP failed with $e \n $st');
     }
-
-    //refresh list manually for now here
-    _getNotes();
   }
 
   @override
   void initState() {
     super.initState();
+    
     _getNotes();
   }
 
@@ -160,24 +160,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 // Operation was canceled by the user.
                 return;
               }
-              final result = await _importNotes(Directory(directoryPath));
-              showDialog(
-                // ignore: use_build_context_synchronously
-                context: context,
-                barrierDismissible: false, // user must tap button!
-                builder: (_) => AlertDialog(
-                  title: const Text("Import Result"),
-                  content: Text(result),
-                  actions: <Widget>[
-                    TextButton(
-                      child: const Text('Ok'),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ],
-                ),
-              );
+              await _importNotes(Directory(directoryPath));
             },
           ),
           IconButton(
@@ -191,7 +174,25 @@ class _MyHomePageState extends State<MyHomePage> {
           ),
         ],
       ),
-      body: Center(
+      body: _importProgress != null
+          ? AlertDialog(
+              title: const Text("Import Result"),
+              content: Text(_importProgress ?? ""),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: _importProgress!.startsWith("Finished")                      
+                      ? () {
+                          setState(() {
+                            _importProgress = null;
+                          });
+                          // Navigator.of(context).pop();
+                        }
+                      : null,
+                  child: const Text('Ok'),
+                ),
+              ],
+            )
+          : Center(
         child: Row(
           children: [
             SizedBox(
@@ -215,6 +216,9 @@ class _MyHomePageState extends State<MyHomePage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           // _addNote("mailnotes test 2", "this is a test 2");
+          //
+          //refresh list manually for now here
+          // await _getNotes();
           throw UnimplementedError("add note not done yet");
         },
         tooltip: 'Add Note',
