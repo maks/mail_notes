@@ -62,7 +62,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
       await client
           .selectMailbox(mailboxes.firstWhere((b) => b.name == "Notes"));
-      final fetchResult = await client.fetchRecentMessages();
+      final fetchResult = await client.fetchRecentMessages(
+        messageCount: 2000,
+      );
 
       debugPrint("result:${fetchResult.messages.length}");
       _notes.clear();
