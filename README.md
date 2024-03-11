@@ -10,6 +10,8 @@ A note taking app which uses an IMAP folder as a storage backend.
 [ ] Add edit & delete  
 [ ] Full text search in notes
 [ ] Local cache for offline access to notes
+[ ] Offline search
+[ ] Markdown viewing support for notes
 
 ## Supported platforms
 
